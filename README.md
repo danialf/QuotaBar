@@ -8,6 +8,10 @@ you which account to use next.
 | Claude (Pro/Max) | 5-hour session, weekly, weekly Opus/Sonnet, extra usage | Reuses the Claude Code login in your Keychain (read-only, never refreshed) |
 | ChatGPT · Codex | 5-hour and weekly limits, credits | Reuses `~/.codex/auth.json`; falls back to the latest Codex session log |
 | GLM · Z.ai Coding Plan | Prompt and tool-call quotas | Z.ai API key (Settings → Accounts) |
+| Kimi Code | 5-hour, weekly and monthly limits | Kimi Code API key (Settings → Accounts) |
+| MiniMax Coding Plan | 5-hour and weekly prompt quotas | Coding Plan key `sk-cp-…` (Settings → Accounts) |
+| Cursor | Included usage per billing cycle, Auto/named split, on-demand spend | Reuses the Cursor app's login (read-only) |
+| Grok · SuperGrok | Credit usage per period | Reuses `grok login` from `~/.grok/auth.json` (read-only) |
 | Anthropic / OpenAI API | Month-to-date spend, budget, projection | Organisation **admin** key (optional) |
 
 ## Recommendation
@@ -42,5 +46,5 @@ Secrets (API, admin and Z.ai keys) are sealed by the Secure Enclave into
 `~/Library/Application Support/QuotaBar/vault.json` and need Touch ID to open. Raw responses from
 the undocumented quota endpoints are kept in `diagnostics/` beside it for debugging parsing.
 
-The Claude and Codex usage endpoints are not public APIs. If one changes shape, that card
+None of the subscription usage endpoints (Claude, Codex, Kimi, MiniMax, Cursor, Grok) are public APIs. If one changes shape, that card
 shows the error and the rest of the app keeps working.

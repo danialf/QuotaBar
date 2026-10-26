@@ -59,7 +59,7 @@ struct CodexProvider {
         guard let w, let used = J.num(w["used_percent"]) else { return nil }
         let seconds = J.num(w["limit_window_seconds"])
         let reset = J.date(w["reset_at"]) ?? J.num(w["reset_after_seconds"]).map { Date().addingTimeInterval($0) }
-        return UsageWindow(label: Self.label(seconds), usedPercent: used, resetsAt: reset, duration: seconds)
+        return UsageWindow(label: Fmt.windowLabel(seconds), usedPercent: used, resetsAt: reset, duration: seconds)
     }
 
     private func fromSessionLogs() throws -> ProviderSnapshot {
@@ -85,7 +85,7 @@ struct CodexProvider {
                 guard let w = any as? [String: Any], let used = J.num(w["used_percent"]) else { return nil }
                 let seconds = J.num(w["window_minutes"]).map { $0 * 60 }
                 let reset = J.date(w["resets_at"]) ?? J.num(w["resets_in_seconds"]).map { stamp.addingTimeInterval($0) }
-                return UsageWindow(label: Self.label(seconds), usedPercent: used, resetsAt: reset, duration: seconds)
+                return UsageWindow(label: Fmt.windowLabel(seconds), usedPercent: used, resetsAt: reset, duration: seconds)
             }
             if !windows.isEmpty {
                 return ProviderSnapshot(account: .codex, plan: nil, windows: windows, updatedAt: stamp)
@@ -99,15 +99,6 @@ struct CodexProvider {
         case nil: nil
         case "prolite": "Pro Lite"
         case let s?: s.capitalized
-        }
-    }
-
-    static func label(_ seconds: Double?) -> String {
-        guard let s = seconds else { return "Window" }
-        switch s {
-        case ..<(6 * 3600): return "Session · \(Fmt.duration(s))"
-        case (6 * 86400)...(8 * 86400): return "Weekly"
-        default: return "Window · \(Fmt.duration(s))"
         }
     }
 }

@@ -305,6 +305,12 @@ private struct SubscriptionsPane: View {
     @AppStorage(Prefs.enabled(.codex)) private var codex = true
     @AppStorage(Prefs.enabled(.zai)) private var zai = true
     @AppStorage(Prefs.zaiChina) private var zaiChina = false
+    @AppStorage(Prefs.enabled(.kimi)) private var kimi = false
+    @AppStorage(Prefs.kimiInternational) private var kimiIntl = false
+    @AppStorage(Prefs.enabled(.minimax)) private var minimax = false
+    @AppStorage(Prefs.minimaxChina) private var minimaxChina = false
+    @AppStorage(Prefs.enabled(.cursor)) private var cursor = false
+    @AppStorage(Prefs.enabled(.grok)) private var grok = false
 
     var body: some View {
         let claudeAccounts = store.accounts.filter { $0.kind == .claude }
@@ -342,10 +348,60 @@ private struct SubscriptionsPane: View {
                     }
                 }
             }
+            SettingsCard(title: "Kimi Code", footer: "Create the key in the Kimi Code console (kimi.com/code/console, or kimi.ai for the international service). It is encrypted by the Secure Enclave.") {
+                Row(title: "Track Kimi", divider: kimi) {
+                    Toggle("", isOn: $kimi).toggleStyle(.switch).labelsHidden()
+                }
+                if kimi {
+                    Row(title: "Status") { AccountStatus(state: store.states[Account.kimi.id]) }
+                    Row(title: "API key") { SecretInput(name: Prefs.kimiKey, placeholder: "Kimi Code API key") }
+                    Row(title: "Region", divider: false) {
+                        Picker("", selection: $kimiIntl) {
+                            Text("China · kimi.com").tag(false)
+                            Text("International · kimi.ai").tag(true)
+                        }
+                        .pickerStyle(.segmented).labelsHidden().frame(width: 300)
+                        .onChange(of: kimiIntl) { store.refreshSoon() }
+                    }
+                }
+            }
+            SettingsCard(title: "MiniMax Coding Plan", footer: "Use the Coding Plan key (sk-cp-…) from the MiniMax platform's Coding Plan page; a regular API key won't show plan quota. It is encrypted by the Secure Enclave.") {
+                Row(title: "Track MiniMax", divider: minimax) {
+                    Toggle("", isOn: $minimax).toggleStyle(.switch).labelsHidden()
+                }
+                if minimax {
+                    Row(title: "Status") { AccountStatus(state: store.states[Account.minimax.id]) }
+                    Row(title: "API key") { SecretInput(name: Prefs.minimaxKey, placeholder: "MiniMax Coding Plan key") }
+                    Row(title: "Region", divider: false) {
+                        Picker("", selection: $minimaxChina) {
+                            Text("Global · minimax.io").tag(false)
+                            Text("China · minimaxi.com").tag(true)
+                        }
+                        .pickerStyle(.segmented).labelsHidden().frame(width: 300)
+                        .onChange(of: minimaxChina) { store.refreshSoon() }
+                    }
+                }
+            }
+            SettingsCard(title: "Cursor", footer: "Uses the Cursor app's own login on this Mac, read-only. Sign in or switch accounts in Cursor.") {
+                Row(title: "Track Cursor", divider: cursor) {
+                    Toggle("", isOn: $cursor).toggleStyle(.switch).labelsHidden()
+                }
+                if cursor { Row(title: "Status", divider: false) { AccountStatus(state: store.states[Account.cursor.id]) } }
+            }
+            SettingsCard(title: "Grok · SuperGrok", footer: "Uses the login from xAI's grok CLI in ~/.grok. Run `grok login` to sign in or switch accounts.") {
+                Row(title: "Track Grok", divider: grok) {
+                    Toggle("", isOn: $grok).toggleStyle(.switch).labelsHidden()
+                }
+                if grok { Row(title: "Status", divider: false) { AccountStatus(state: store.states[Account.grok.id]) } }
+            }
         }
         .onChange(of: claude) { store.refreshSoon() }
         .onChange(of: codex) { store.refreshSoon() }
         .onChange(of: zai) { store.refreshSoon() }
+        .onChange(of: kimi) { store.refreshSoon() }
+        .onChange(of: minimax) { store.refreshSoon() }
+        .onChange(of: cursor) { store.refreshSoon() }
+        .onChange(of: grok) { store.refreshSoon() }
     }
 }
 

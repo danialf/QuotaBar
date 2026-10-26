@@ -10,6 +10,12 @@ enum Prefs {
     static let notify = "notifyThresholds"
     static let notifyRanking = "notifyRanking"
     static let zaiKey = "zai.apiKey"
+    static let kimiKey = "kimi.apiKey"
+    static let kimiInternational = "kimiInternational"
+    static let minimaxKey = "minimax.apiKey"
+    static let minimaxChina = "minimaxChina"
+    /// Provider keys sealed in the vault, opened together by the first unlock.
+    static let providerKeys = [zaiKey, kimiKey, minimaxKey]
     static let relockMinutes = "relockMinutes"
     static let showInDock = "showInDock"
     static let overlayShown = "overlayShown"
@@ -21,6 +27,12 @@ enum Prefs {
         var defaults: [String: Any] = [refreshMinutes: 5, menuBarStyle: MenuBarStyle.bars.rawValue,
                                        menuBarAll: false, zaiChina: false, notify: true, notifyRanking: true, relockMinutes: 30, showInDock: true]
         for p in ProviderID.allCases { defaults[enabled(p)] = true }
+        // Newer providers start on only where there's something to read, so they don't
+        // appear as error cards for services you don't use.
+        defaults[enabled(.kimi)] = Vault.has(kimiKey)
+        defaults[enabled(.minimax)] = Vault.has(minimaxKey)
+        defaults[enabled(.cursor)] = CursorProvider.hasLogin
+        defaults[enabled(.grok)] = GrokProvider.hasLogin
         UserDefaults.standard.register(defaults: defaults)
     }
 
@@ -129,7 +141,7 @@ final class UsageStore: ObservableObject {
             let context = try await Vault.authenticate(reason: "unlock QuotaBar")
             if sessionSecrets == nil {
                 var secrets: [String: String] = [:]
-                for name in [Prefs.zaiKey] + apiAccounts.map(\.keychainKey) where Vault.has(name) {
+                for name in Prefs.providerKeys + apiAccounts.map(\.keychainKey) where Vault.has(name) {
                     secrets[name] = try? Vault.open(name, context: context)
                 }
                 sessionSecrets = secrets
@@ -208,13 +220,15 @@ final class UsageStore: ObservableObject {
 
         if full {
             let claude = await Task.detached { ClaudeProvider.discover() }.value
-            accounts = claude + [.codex, .zai]
+            accounts = claude + Account.fixed
         }
         for a in accounts where states[a.id] == nil { states[a.id] = .loading }
 
-        let zaiKey = secret(Prefs.zaiKey)
-        let zaiLocked = sessionSecrets == nil && Vault.has(Prefs.zaiKey)
+        let keys = Dictionary(uniqueKeysWithValues: Prefs.providerKeys.map { ($0, secret($0)) })
+        let locked = Set(Prefs.providerKeys.filter { sessionSecrets == nil && Vault.has($0) })
         let china = defaults.bool(forKey: Prefs.zaiChina)
+        let kimiIntl = defaults.bool(forKey: Prefs.kimiInternational)
+        let minimaxChina = defaults.bool(forKey: Prefs.minimaxChina)
         let enabled = accounts.filter(Prefs.isEnabled)
         for a in accounts where !enabled.contains(a) { states[a.id] = .disabled }
 
@@ -222,11 +236,15 @@ final class UsageStore: ObservableObject {
             for a in enabled {
                 group.addTask {
                     do {
-                        if a.kind == .zai, zaiLocked { throw ProviderError("Unlock QuotaBar with Touch ID to load") }
+                        if let key = Self.keyName(a.kind), locked.contains(key) { throw ProviderError("Unlock QuotaBar with Touch ID to load") }
                         let snap: ProviderSnapshot = switch a.kind {
                         case .claude: try await ClaudeProvider(account: a).fetch()
                         case .codex: try await CodexProvider().fetch()
-                        case .zai: try await ZaiProvider(apiKey: zaiKey, china: china).fetch()
+                        case .zai: try await ZaiProvider(apiKey: keys[Prefs.zaiKey] ?? nil, china: china).fetch()
+                        case .kimi: try await KimiProvider(apiKey: keys[Prefs.kimiKey] ?? nil, international: kimiIntl).fetch()
+                        case .minimax: try await MiniMaxProvider(apiKey: keys[Prefs.minimaxKey] ?? nil, china: minimaxChina).fetch()
+                        case .cursor: try await CursorProvider().fetch()
+                        case .grok: try await GrokProvider().fetch()
                         }
                         return (a, .ok(snap))
                     } catch {
@@ -263,6 +281,16 @@ final class UsageStore: ObservableObject {
         recompute()
         notifyThresholds()
         notifyRanking()
+    }
+
+    /// The vault entry holding a provider's API key, for providers that use one.
+    private nonisolated static func keyName(_ kind: ProviderID) -> String? {
+        switch kind {
+        case .zai: Prefs.zaiKey
+        case .kimi: Prefs.kimiKey
+        case .minimax: Prefs.minimaxKey
+        default: nil
+        }
     }
 
     private func refreshSpends() async {

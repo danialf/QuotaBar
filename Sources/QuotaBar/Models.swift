@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum ProviderID: String, CaseIterable, Identifiable, Codable {
-    case claude, codex, zai
+    case claude, codex, zai, kimi, minimax, cursor, grok
 
     var id: String { rawValue }
 
@@ -10,6 +10,10 @@ enum ProviderID: String, CaseIterable, Identifiable, Codable {
         case .claude: "Claude"
         case .codex: "ChatGPT · Codex"
         case .zai: "GLM · Z.ai"
+        case .kimi: "Kimi Code"
+        case .minimax: "MiniMax"
+        case .cursor: "Cursor"
+        case .grok: "Grok · SuperGrok"
         }
     }
 
@@ -18,6 +22,10 @@ enum ProviderID: String, CaseIterable, Identifiable, Codable {
         case .claude: "Claude"
         case .codex: "Codex"
         case .zai: "GLM"
+        case .kimi: "Kimi"
+        case .minimax: "MiniMax"
+        case .cursor: "Cursor"
+        case .grok: "Grok"
         }
     }
 
@@ -27,6 +35,10 @@ enum ProviderID: String, CaseIterable, Identifiable, Codable {
         case .claude: "C"
         case .codex: "G"
         case .zai: "Z"
+        case .kimi: "K"
+        case .minimax: "M"
+        case .cursor: "Cu"
+        case .grok: "X"
         }
     }
 
@@ -35,6 +47,10 @@ enum ProviderID: String, CaseIterable, Identifiable, Codable {
         case .claude: "sparkle"
         case .codex: "circle.hexagongrid.fill"
         case .zai: "z.circle.fill"
+        case .kimi: "moon.stars.fill"
+        case .minimax: "waveform"
+        case .cursor: "cursorarrow.rays"
+        case .grok: "bolt.horizontal.fill"
         }
     }
 
@@ -43,6 +59,10 @@ enum ProviderID: String, CaseIterable, Identifiable, Codable {
         case .claude: Color(red: 0.85, green: 0.47, blue: 0.34)
         case .codex: Color(red: 0.06, green: 0.64, blue: 0.50)
         case .zai: Color(red: 0.36, green: 0.42, blue: 0.98)
+        case .kimi: Color(red: 0.05, green: 0.62, blue: 0.86)
+        case .minimax: Color(red: 0.92, green: 0.29, blue: 0.47)
+        case .cursor: Color(red: 0.62, green: 0.46, blue: 0.94)
+        case .grok: Color(red: 0.88, green: 0.70, blue: 0.18)
         }
     }
 }
@@ -58,7 +78,7 @@ struct Account: Identifiable, Hashable, Codable {
     var title: String { kind == .claude ? "Claude · \(label)" : kind.name }
     var shortName: String { kind == .claude ? "Claude \(label)" : kind.shortName }
 
-    /// Up to two characters for the menu bar: C1, C2, CP, CG, G, Z.
+    /// Up to two characters for the menu bar: C1, C2, CP, CG, G, Z, Cu.
     var glyph: String {
         guard kind == .claude else { return kind.glyph }
         if let digit = label.last(where: \.isNumber) { return "C\(digit)" }
@@ -67,6 +87,12 @@ struct Account: Identifiable, Hashable, Codable {
 
     static let codex = Account(id: "codex", kind: .codex, label: "ChatGPT")
     static let zai = Account(id: "zai", kind: .zai, label: "GLM")
+    static let kimi = Account(id: "kimi", kind: .kimi, label: "Kimi")
+    static let minimax = Account(id: "minimax", kind: .minimax, label: "MiniMax")
+    static let cursor = Account(id: "cursor", kind: .cursor, label: "Cursor")
+    static let grok = Account(id: "grok", kind: .grok, label: "Grok")
+    /// Every account except Claude, which is discovered per profile.
+    static let fixed: [Account] = [.codex, .zai, .kimi, .minimax, .cursor, .grok]
 }
 
 /// One rate-limit window (5-hour session, weekly, monthly…).
@@ -307,6 +333,17 @@ enum Fmt {
         if hours < 24 { return minutes % 60 == 0 ? "\(hours)h" : "\(hours)h \(minutes % 60)m" }
         let days = hours / 24
         return hours % 24 == 0 ? "\(days)d" : "\(days)d \(hours % 24)h"
+    }
+
+    /// "Session · 5h", "Weekly", "Monthly" from a window's length.
+    static func windowLabel(_ seconds: Double?) -> String {
+        guard let s = seconds else { return "Window" }
+        switch s {
+        case ..<(6 * 3600): return "Session · \(duration(s))"
+        case (6 * 86400)...(8 * 86400): return "Weekly"
+        case (27 * 86400)...(32 * 86400): return "Monthly"
+        default: return "Window · \(duration(s))"
+        }
     }
 
     static func percent(_ p: Double) -> String { "\(Int(p.rounded()))%" }
