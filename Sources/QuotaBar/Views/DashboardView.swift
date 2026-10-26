@@ -267,19 +267,115 @@ struct Card<Content: View>: View {
     }
 }
 
-private struct AdviceGlow: View {
+/// Base for the ambient loops. They run as Core Animation on the render server, so they cost
+/// nothing per frame here: an endless SwiftUI phaseAnimator re-evaluates and re-lays-out the
+/// whole window every frame, which held an open Dashboard at ~50% CPU.
+private class AmbientLayerView: NSView {
+    private var laidOutSize = CGSize.zero
+
+    init() {
+        super.init(frame: .zero)
+        wantsLayer = true
+        setUp()
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) is not used") }
+
+    /// Decoration only: clicks and hover go to the card underneath.
+    override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+    override func layout() {
+        super.layout()
+        guard bounds.size != laidOutSize, bounds.width > 0, bounds.height > 0 else { return }
+        laidOutSize = bounds.size
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        withAppearance { resized(); applyColors() }
+        CATransaction.commit()
+    }
+
+    override func viewDidChangeEffectiveAppearance() {
+        super.viewDidChangeEffectiveAppearance()
+        withAppearance(applyColors)
+    }
+
+    /// Re-adds the loop after a detach strips it, e.g. when the popover closes and reopens.
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        guard window != nil, laidOutSize != .zero else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        withAppearance(resized)
+        CATransaction.commit()
+    }
+
+    func withAppearance(_ body: () -> Void) { effectiveAppearance.performAsCurrentDrawingAppearance(body) }
+
+    func setUp() {}
+    /// Lays out the layers for the new size and (re)starts the loop.
+    func resized() {}
+    func applyColors() {}
+}
+
+private struct AdviceGlow: NSViewRepresentable {
     let tint: Color
 
-    var body: some View {
-        Color.clear.phaseAnimator([false, true]) { _, on in
-            ZStack {
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(RadialGradient(colors: [tint.opacity(on ? 0.2 : 0.05), .clear],
-                                         center: on ? .bottomTrailing : .topLeading, startRadius: 0, endRadius: 230))
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .strokeBorder(tint.opacity(on ? 0.22 : 0), lineWidth: 1)
-            }
-        } animation: { _ in .easeInOut(duration: 4) }
+    func makeNSView(context: Context) -> AdviceGlowView { AdviceGlowView() }
+    func updateNSView(_ view: AdviceGlowView, context: Context) { view.tint = NSColor(tint) }
+}
+
+/// A soft radial wash that drifts from the top-leading corner to the bottom-trailing one and back, 4s each way.
+private final class AdviceGlowView: AmbientLayerView {
+    private let glow = CAGradientLayer()
+    private let border = CALayer()
+    var tint = NSColor.clear { didSet { if tint != oldValue { restyle() } } }
+
+    override func setUp() {
+        glow.type = .radial
+        for l in [glow, border] {
+            l.cornerRadius = 12
+            l.cornerCurve = .continuous
+            l.masksToBounds = true
+            layer?.addSublayer(l)
+        }
+        border.borderWidth = 1
+    }
+
+    /// Recolouring restarts the loop, since the animations hold their colours.
+    private func restyle() {
+        guard bounds.width > 0 else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        withAppearance(resized)
+        CATransaction.commit()
+    }
+
+    override func resized() {
+        glow.frame = bounds
+        border.frame = bounds
+        // Unit space, origin bottom-left; endPoint sets a 230pt radius, as the SwiftUI version had.
+        let rx = 230 / bounds.width, ry = 230 / bounds.height
+        let from = CGPoint(x: 0, y: 1), to = CGPoint(x: 1, y: 0)
+        let dim = [tint.withAlphaComponent(0.05).cgColor, tint.withAlphaComponent(0).cgColor]
+        let lit = [tint.withAlphaComponent(0.2).cgColor, tint.withAlphaComponent(0).cgColor]
+        glow.startPoint = from
+        glow.endPoint = CGPoint(x: from.x + rx, y: from.y + ry)
+        glow.colors = dim
+        border.borderColor = tint.withAlphaComponent(0).cgColor
+
+        func loop(_ key: String, _ a: Any, _ b: Any) -> CABasicAnimation {
+            let anim = CABasicAnimation(keyPath: key)
+            anim.fromValue = a; anim.toValue = b
+            anim.duration = 4
+            anim.autoreverses = true
+            anim.repeatCount = .infinity
+            anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            return anim
+        }
+        glow.add(loop("startPoint", from, to), forKey: "start")
+        glow.add(loop("endPoint", CGPoint(x: from.x + rx, y: from.y + ry), CGPoint(x: to.x + rx, y: to.y + ry)), forKey: "end")
+        glow.add(loop("colors", dim, lit), forKey: "colors")
+        border.add(loop("borderColor", tint.withAlphaComponent(0).cgColor, tint.withAlphaComponent(0.22).cgColor), forKey: "border")
     }
 }
 
@@ -429,16 +525,41 @@ struct ProviderCard: View {
     }
 }
 
-private struct PulseRing: View {
+private struct PulseRing: NSViewRepresentable {
     let color: Color
 
-    var body: some View {
-        Color.clear.phaseAnimator([false, true]) { _, grow in
-            Circle().strokeBorder(color, lineWidth: 1.2)
-                .scaleEffect(grow ? 2.8 : 1)
-                .opacity(grow ? 0 : 0.5)
-        } animation: { $0 ? .easeOut(duration: 2.2) : nil }
+    func makeNSView(context: Context) -> PulseRingView { PulseRingView() }
+    func updateNSView(_ view: PulseRingView, context: Context) { view.color = NSColor(color) }
+}
+
+/// A ring that grows and fades every 2.2s.
+private final class PulseRingView: AmbientLayerView {
+    private let ring = CAShapeLayer()
+    var color = NSColor.clear { didSet { if color != oldValue { applyColors() } } }
+
+    override func setUp() {
+        ring.fillColor = nil
+        ring.lineWidth = 1.2
+        layer?.addSublayer(ring)
     }
+
+    override func resized() {
+        ring.frame = bounds
+        ring.path = CGPath(ellipseIn: bounds.insetBy(dx: 0.6, dy: 0.6), transform: nil)
+        let scale = CABasicAnimation(keyPath: "transform.scale")
+        scale.fromValue = 1; scale.toValue = 2.8
+        let fade = CABasicAnimation(keyPath: "opacity")
+        fade.fromValue = 0.5; fade.toValue = 0
+        let pulse = CAAnimationGroup()
+        pulse.animations = [scale, fade]
+        pulse.duration = 2.2
+        pulse.timingFunction = CAMediaTimingFunction(name: .easeOut)
+        pulse.repeatCount = .infinity
+        ring.opacity = 0
+        ring.add(pulse, forKey: "pulse")
+    }
+
+    override func applyColors() { ring.strokeColor = color.cgColor }
 }
 
 struct StatusDot: View {
