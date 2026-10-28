@@ -61,6 +61,7 @@ struct SpendProvider {
                 URLQueryItem(name: "api_key_ids[]", value: id),
             ] + (page.map { [URLQueryItem(name: "page", value: $0)] } ?? [])
             let obj = try J.object(try await HTTP.get(adminRequest(c.url!)))
+            if page == nil { Diagnostics.save("anthropic-key-usage-\(account.id.prefix(8)).json", obj) }
             for bucket in obj["data"] as? [[String: Any]] ?? [] {
                 for r in bucket["results"] as? [[String: Any]] ?? [] {
                     let cache = r["cache_creation"] as? [String: Any] ?? [:]
@@ -97,6 +98,7 @@ struct SpendProvider {
             req.setValue(adminKey, forHTTPHeaderField: "x-api-key")
             req.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
             let obj = try J.object(try await HTTP.get(req))
+            if page == nil { Diagnostics.save("anthropic-cost-\(account.id.prefix(8)).json", obj) }
             for bucket in obj["data"] as? [[String: Any]] ?? [] {
                 let cents = (bucket["results"] as? [[String: Any]] ?? []).reduce(0) { $0 + (J.num($1["amount"]) ?? 0) }
                 out.append(Bucket(start: J.date(bucket["starting_at"]) ?? start, amount: cents / 100)) // reported in cents
