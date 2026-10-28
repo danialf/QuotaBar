@@ -37,6 +37,9 @@ struct BriefView: View {
                 }
                 if accounts.isEmpty {
                     Text("No accounts yet. Sign in to Claude Code or Codex.").font(.caption).foregroundStyle(.secondary)
+                } else {
+                    Divider().opacity(0.5)
+                    PulseLine()
                 }
             }
             .entrance(1)

@@ -46,6 +46,9 @@ struct DashboardView: View {
             if !warnings.isEmpty {
                 WarningsCard(warnings: warnings).entrance(base)
             }
+            SectionTitle("Now")
+            NextResetCard(more: 4, wide: true).entrance(base)
+            AgentsCard(fieldHeight: 190, wide: true).entrance(base + 1)
             SectionTitle("Subscriptions")
             LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
                 ForEach(accounts, id: \.element.0.id) { i, item in

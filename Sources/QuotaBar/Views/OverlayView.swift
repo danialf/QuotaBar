@@ -169,6 +169,10 @@ struct OverlayView: View {
             if accounts.isEmpty {
                 Text("No accounts yet. Sign in to Claude Code or Codex.").font(.caption).foregroundStyle(.secondary)
             }
+            if !accounts.isEmpty {
+                Divider().opacity(0.5)
+                PulseLine()
+            }
             if let first = store.advice?.warnings.first {
                 Label(first.text, systemImage: "exclamationmark.circle.fill")
                     .font(.caption).lineLimit(2)
@@ -196,6 +200,8 @@ struct OverlayView: View {
         return VStack(alignment: .leading, spacing: 10) {
             if let advice = store.advice { AdviceCard(advice: advice) }
             if !warnings.isEmpty { WarningsCard(warnings: warnings) }
+            NextResetCard(more: 2)
+            AgentsCard(fieldHeight: 150)
             ForEach(accounts, id: \.element.0.id) { i, item in
                 ProviderCard(account: item.0, state: item.1,
                              rank: store.advice?.ranking.first { $0.id == item.0.id }, order: i)

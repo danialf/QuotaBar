@@ -13,7 +13,7 @@ import SwiftUI
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     static var headless: Bool {
-        CommandLine.arguments.contains { ["--dump", "--snapshot", "--make-icon"].contains($0) }
+        CommandLine.arguments.contains { ["--dump", "--snapshot", "--make-icon", "--agents"].contains($0) }
     }
 
     func applicationWillFinishLaunching(_ notification: Notification) {
@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor in AppIconView.writeIconset(to: dir); exit(0) }
         }
         if CommandLine.arguments.contains("--dump") { Task { await Self.dump(); exit(0) } }
+        if CommandLine.arguments.contains("--agents") { Task { await Self.agents(); exit(0) } }
         if let i = CommandLine.arguments.firstIndex(of: "--snapshot"), i + 1 < CommandLine.arguments.count {
             let path = CommandLine.arguments[i + 1]
             Task { await Self.snapshot(to: path); exit(0) }
@@ -52,6 +53,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor private static func snapshot(to path: String) async {
         let store = UsageStore()
         await store.refresh()
+        // Two scans, so CPU has an interval to measure over.
+        await AgentMonitor.shared.scanNow()
+        try? await Task.sleep(for: .seconds(2))
+        await AgentMonitor.shared.scanNow()
         let views: [(String, AnyView)] = [
             ("brief", AnyView(BriefView(snapshotMode: true))),
             ("dashboard", AnyView(DashboardView(snapshotMode: true).frame(width: 820))),
@@ -68,6 +73,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let rep = NSBitmapImageRep(cgImage: cg)
             try? rep.representation(using: .png, properties: [:])?.write(to: URL(fileURLWithPath: out))
             print("wrote \(out) \(cg.width)x\(cg.height)")
+        }
+    }
+
+    /// `QuotaBar --agents`: scan running agents twice, 3s apart, and print them by project.
+    @MainActor private static func agents() async {
+        let monitor = AgentMonitor.shared
+        let start = Date.now
+        await monitor.scanNow()
+        print("scan took \(Int(Date.now.timeIntervalSince(start) * 1000))ms")
+        try? await Task.sleep(for: .seconds(3))
+        let again = Date.now
+        await monitor.scanNow()
+        print("rescan took \(Int(Date.now.timeIntervalSince(again) * 1000))ms")
+        for p in monitor.projects {
+            print("\(p.name)  [\(p.path)]  \(p.working)/\(p.sessions.count) working")
+            for s in p.sessions {
+                let cpu = String(format: "%.1f%%", s.cpu * 100)
+                print("   \(s.kind.name) pid \(s.pid)  \(s.provider?.shortName ?? "-")  \(s.accountID ?? "")  \(s.place ?? "")  cpu \(cpu)  children \(s.children)  up \(Fmt.duration(Date.now.timeIntervalSince(s.started)))")
+            }
         }
     }
 
