@@ -395,7 +395,8 @@ final class AgentMonitor: ObservableObject {
 
 // MARK: - Next reset
 
-/// Windows in reset order, soonest first: the moment quota comes back.
+/// Weekly (and longer) windows in reset order, soonest first: the moment real quota comes back.
+/// Session windows are left out; they roll over every few hours and say little about the week.
 enum ResetSchedule {
     struct Entry: Identifiable {
         var id: String { "\(account.id).\(window.label)" }
@@ -404,12 +405,14 @@ enum ResetSchedule {
         let resetsAt: Date
     }
 
+    static let minimumWindow: TimeInterval = 86400
+
     /// Only windows with something used: a reset that frees nothing isn't worth waiting for.
     /// Falls back to every window when nothing has been used yet.
     static func upcoming(_ snapshots: [ProviderSnapshot], now: Date = .now) -> [Entry] {
         let all = snapshots.flatMap { snap in
             snap.quotas.compactMap { w -> Entry? in
-                guard let r = w.resetsAt, r > now else { return nil }
+                guard let r = w.resetsAt, r > now, let d = w.duration, d >= minimumWindow else { return nil }
                 return Entry(account: snap.account, window: w, resetsAt: r)
             }
         }

@@ -19,6 +19,12 @@ final class AgentTests: XCTestCase {
         XCTAssertEqual(order, ["b.W0", "a.W1"])
     }
 
+    func testSessionWindowsAreLeftOut() {
+        var a = snap("a", [(30, 7200)])
+        a.windows.insert(UsageWindow(label: "Session", usedPercent: 50, resetsAt: now.addingTimeInterval(600), duration: 5 * 3600), at: 0)
+        XCTAssertEqual(ResetSchedule.upcoming([a], now: now).map(\.window.label), ["W0"])
+    }
+
     func testFallsBackToAllWindowsWhenNothingIsUsed() {
         let a = snap("a", [(0, 600), (0, 7200)])
         XCTAssertEqual(ResetSchedule.upcoming([a], now: now).first?.id, "a.W0")
