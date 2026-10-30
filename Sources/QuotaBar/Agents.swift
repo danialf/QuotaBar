@@ -420,6 +420,26 @@ enum ResetSchedule {
         let used = all.filter { $0.window.usedPercent >= 1 }
         return used.isEmpty ? all : used
     }
+
+    /// One point on the timeline: every window that resets within the same minute.
+    struct Stop: Identifiable {
+        var id: String { entries.map(\.id).joined(separator: "|") }
+        let resetsAt: Date
+        let entries: [Entry]
+    }
+
+    /// Groups `entries` (already in reset order) into stops, so windows that reset together share one.
+    static func stops(_ entries: [Entry]) -> [Stop] {
+        var stops: [Stop] = []
+        for e in entries {
+            if let last = stops.last, e.resetsAt.timeIntervalSince(last.resetsAt) < 60 {
+                stops[stops.count - 1] = Stop(resetsAt: last.resetsAt, entries: last.entries + [e])
+            } else {
+                stops.append(Stop(resetsAt: e.resetsAt, entries: [e]))
+            }
+        }
+        return stops
+    }
 }
 
 // MARK: - Bubble packing

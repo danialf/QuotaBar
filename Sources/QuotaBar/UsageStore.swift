@@ -20,12 +20,14 @@ enum Prefs {
     static let showInDock = "showInDock"
     static let overlayShown = "overlayShown"
     static let overlayExpanded = "overlayExpanded"
+    static let resetView = "resetView"
     static func enabled(_ id: String) -> String { "enabled.\(id)" }
     static func enabled(_ p: ProviderID) -> String { "enabled.\(p.rawValue)" }
 
     static func register() {
         var defaults: [String: Any] = [refreshMinutes: 5, menuBarStyle: MenuBarStyle.bars.rawValue,
-                                       menuBarAll: false, zaiChina: false, notify: true, notifyRanking: true, relockMinutes: 30, showInDock: true]
+                                       menuBarAll: false, zaiChina: false, notify: true, notifyRanking: true, relockMinutes: 30, showInDock: true,
+                                       resetView: ResetViewStyle.both.rawValue]
         for p in ProviderID.allCases { defaults[enabled(p)] = true }
         // Newer providers start on only where there's something to read, so they don't
         // appear as error cards for services you don't use.
@@ -52,6 +54,20 @@ enum MenuBarStyle: String, CaseIterable, Identifiable {
         case .bars: "Mini bars"
         case .percent: "Percentages"
         case .icon: "Icon only"
+        }
+    }
+}
+
+/// How the Now section shows upcoming resets.
+enum ResetViewStyle: String, CaseIterable, Identifiable {
+    case ring, timeline, both, none
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .ring: "Ring"
+        case .timeline: "Timeline"
+        case .both: "Both"
+        case .none: "None"
         }
     }
 }

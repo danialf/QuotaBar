@@ -26,8 +26,11 @@ than the window refills.
 
 ## Now: next reset and agents
 
-The Dashboard opens with a ring counting down to the soonest weekly (or longer) reset that frees
-something, and the resets after it; 5-hour session windows are left out. Below it, a bubble per project shows which coding agents (Claude Code, Codex,
+The Dashboard opens with the upcoming weekly (or longer) resets that free something; 5-hour
+session windows are left out. Settings → General → Resets picks how: a ring counting down to the
+soonest reset with a list of the ones after it, a left-to-right timeline starting at now with the
+date and time of each reset and the accounts it frees (resets within the same minute share a stop),
+both side by side, or neither. Below it, a bubble per project shows which coding agents (Claude Code, Codex,
 Cursor Agent, Gemini, OpenCode, Aider…) are running where: area follows how many agents are there
 and how busy they are, and each dot on the rim is one agent, solid while working (its process tree
 is using CPU) and hollow while it waits at a prompt. Worktrees fold into their repository, and a

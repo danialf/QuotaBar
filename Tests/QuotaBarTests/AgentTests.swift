@@ -30,6 +30,13 @@ final class AgentTests: XCTestCase {
         XCTAssertEqual(ResetSchedule.upcoming([a], now: now).first?.id, "a.W0")
     }
 
+    func testResetsWithinAMinuteShareAStop() {
+        let a = snap("a", [(10, 7200), (20, 86400)])
+        let b = snap("b", [(30, 7230)])
+        let stops = ResetSchedule.stops(ResetSchedule.upcoming([a, b], now: now))
+        XCTAssertEqual(stops.map { $0.entries.map(\.id) }, [["a.W0", "b.W0"], ["a.W1"]])
+    }
+
     // MARK: Bubbles
 
     func testPackedBubblesNeverOverlap() {

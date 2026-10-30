@@ -2,45 +2,77 @@ import SwiftUI
 
 // MARK: - Next reset
 
-/// A ring that fills as the soonest reset approaches, then the resets after it.
+/// The upcoming resets as a countdown ring, a left-to-right timeline, or both, per Settings.
 struct NextResetCard: View {
     @EnvironmentObject private var store: UsageStore
+    @AppStorage(Prefs.resetView) private var style = ResetViewStyle.both.rawValue
     var more = 3
-    /// The later resets beside the ring rather than under it.
+    /// Ring and timeline side by side rather than stacked, with wider timeline stops.
     var wide = false
 
     var body: some View {
-        // Re-render on a clock so the countdown moves between refreshes.
-        TimelineView(.periodic(from: .now, by: 20)) { context in
-            let entries = ResetSchedule.upcoming(store.orderedAccounts.compactMap { $0.1.snapshot }, now: context.date)
-            Card {
-                if let first = entries.first {
-                    let rest = entries.dropFirst().prefix(more)
-                    let layout = wide ? AnyLayout(HStackLayout(alignment: .center, spacing: 18)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
-                    layout {
-                    HStack(alignment: .center, spacing: 14) {
-                        ResetRing(entry: first, now: context.date)
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text("NEXT RESET").font(.system(size: 9.5, weight: .semibold)).tracking(0.8).foregroundStyle(.secondary)
-                            Text("\(first.account.shortName) · \(first.window.label)")
-                                .font(.system(size: 14, weight: .semibold)).lineLimit(1)
-                            Text("Frees \(Fmt.percent(first.window.usedPercent)) at \(first.resetsAt, format: .dateTime.hour().minute())")
-                                .font(.callout).foregroundStyle(.secondary)
+        let style = ResetViewStyle(rawValue: style) ?? .both
+        if style != .none {
+            // Re-render on a clock so the countdowns move between refreshes.
+            TimelineView(.periodic(from: .now, by: 20)) { context in
+                let entries = ResetSchedule.upcoming(store.orderedAccounts.compactMap { $0.1.snapshot }, now: context.date)
+                Card {
+                    if let first = entries.first {
+                        switch style {
+                        case .ring:
+                            ringWithList(first, rest: Array(entries.dropFirst().prefix(more)), now: context.date)
+                        case .timeline:
+                            timeline(entries, now: context.date)
+                        default:
+                            let layout = wide ? AnyLayout(HStackLayout(alignment: .center, spacing: 18)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+                            layout {
+                                ringHeader(first, now: context.date).frame(maxWidth: wide ? 300 : .infinity)
+                                Divider().opacity(0.5)
+                                timeline(entries, now: context.date)
+                            }
                         }
-                        Spacer(minLength: 0)
+                    } else {
+                        Label("No reset scheduled", systemImage: "clock")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
-                    .frame(maxWidth: wide ? 340 : .infinity)
-                    if !rest.isEmpty {
-                        Divider().opacity(0.5)
-                        VStack(spacing: 5) {
-                            ForEach(Array(rest)) { e in ResetRow(entry: e, now: context.date) }
-                        }
-                    }
-                    }
-                } else {
-                    Label("No reset scheduled", systemImage: "clock")
-                        .font(.caption).foregroundStyle(.secondary)
                 }
+            }
+        }
+    }
+
+    private func ringHeader(_ first: ResetSchedule.Entry, now: Date) -> some View {
+        HStack(alignment: .center, spacing: 14) {
+            ResetRing(entry: first, now: now)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("NEXT RESET").font(.system(size: 9.5, weight: .semibold)).tracking(0.8).foregroundStyle(.secondary)
+                Text("\(first.account.shortName) · \(first.window.label)")
+                    .font(.system(size: 14, weight: .semibold)).lineLimit(1)
+                Text("Frees \(Fmt.percent(first.window.usedPercent)) at \(first.resetsAt, format: .dateTime.hour().minute())")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+
+    private func ringWithList(_ first: ResetSchedule.Entry, rest: [ResetSchedule.Entry], now: Date) -> some View {
+        let layout = wide ? AnyLayout(HStackLayout(alignment: .center, spacing: 18)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 10))
+        return layout {
+            ringHeader(first, now: now).frame(maxWidth: wide ? 340 : .infinity)
+            if !rest.isEmpty {
+                Divider().opacity(0.5)
+                VStack(spacing: 5) {
+                    ForEach(rest) { e in ResetRow(entry: e, now: now) }
+                }
+            }
+        }
+    }
+
+    private func timeline(_ entries: [ResetSchedule.Entry], now: Date) -> some View {
+        let stops = ResetSchedule.stops(entries)
+        // As many stops as fit the width, soonest first.
+        return ViewThatFits(in: .horizontal) {
+            ForEach((1...max(1, min(more + 1, stops.count))).reversed(), id: \.self) { n in
+                ResetTimeline(stops: Array(stops.prefix(n)), now: now, stopWidth: wide ? 112 : 88)
             }
         }
     }
@@ -89,6 +121,135 @@ private struct ResetRow: View {
                 .font(.caption.weight(.medium)).monospacedDigit()
                 .frame(minWidth: 62, alignment: .trailing)
         }
+    }
+}
+
+private struct ResetTimeline: View {
+    let stops: [ResetSchedule.Stop]
+    let now: Date
+    let stopWidth: CGFloat
+
+    /// Height of the date/time labels above the line; the line runs through the dots just below.
+    private let head: CGFloat = 30
+    private let dot: CGFloat = 12
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 0) {
+            NowStop(now: now, head: head, dot: dot).frame(width: stopWidth * 0.6)
+            ForEach(Array(stops.enumerated()), id: \.element.id) { i, stop in
+                Gap(seconds: stop.resetsAt.timeIntervalSince(i == 0 ? now : stops[i - 1].resetsAt), head: head, dot: dot)
+                ResetStop(stop: stop, now: now, first: i == 0, head: head, dot: dot).frame(width: stopWidth)
+            }
+            Gap(seconds: nil, head: head, dot: dot).frame(maxWidth: 22)
+        }
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// The stretch of line between two stops, labelled with how long it is.
+private struct Gap: View {
+    let seconds: TimeInterval?
+    let head: CGFloat
+    let dot: CGFloat
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Text(seconds.map { "+\(Fmt.duration($0))" } ?? " ")
+                .font(.system(size: 9.5, weight: .medium)).monospacedDigit().foregroundStyle(.tertiary)
+                .lineLimit(1).minimumScaleFactor(0.7)
+                .frame(height: head, alignment: .bottom).padding(.bottom, 2)
+            ZStack(alignment: .trailing) {
+                Rectangle().fill(.primary.opacity(0.18)).frame(height: 2)
+                if seconds == nil {
+                    Image(systemName: "chevron.right").font(.system(size: 8, weight: .bold)).foregroundStyle(.primary.opacity(0.25))
+                }
+            }
+            .frame(height: dot)
+        }
+        .frame(minWidth: 16, maxWidth: .infinity)
+    }
+}
+
+private struct NowStop: View {
+    let now: Date
+    let head: CGFloat
+    let dot: CGFloat
+
+    var body: some View {
+        VStack(spacing: 2) {
+            VStack(spacing: 0) {
+                Text("Now").font(.system(size: 11, weight: .semibold))
+                Text(now, format: .dateTime.hour().minute()).font(.system(size: 10)).monospacedDigit().foregroundStyle(.secondary)
+            }
+            .frame(height: head, alignment: .bottom)
+            Lane(dot: dot) {
+                Circle().fill(.primary.opacity(0.7)).frame(width: dot * 0.7, height: dot * 0.7)
+            }
+            Text(now, format: .dateTime.weekday(.abbreviated).day()).font(.system(size: 10)).foregroundStyle(.secondary)
+        }
+    }
+}
+
+private struct ResetStop: View {
+    let stop: ResetSchedule.Stop
+    let now: Date
+    let first: Bool
+    let head: CGFloat
+    let dot: CGFloat
+
+    var body: some View {
+        let tint = stop.entries[0].account.kind.tint
+        VStack(spacing: 2) {
+            VStack(spacing: 0) {
+                Text(stop.resetsAt, format: .dateTime.weekday(.abbreviated).day().month(.abbreviated))
+                    .font(.system(size: 11, weight: .semibold)).lineLimit(1).minimumScaleFactor(0.8)
+                Text(stop.resetsAt, format: .dateTime.hour().minute())
+                    .font(.system(size: 10)).monospacedDigit().foregroundStyle(.secondary)
+            }
+            .frame(height: head, alignment: .bottom)
+            Lane(dot: dot) {
+                ZStack {
+                    if first { Circle().fill(tint.opacity(0.25)).frame(width: dot + 6, height: dot + 6) }
+                    Circle().fill(tint).frame(width: dot, height: dot)
+                    Circle().strokeBorder(.background, lineWidth: 2).frame(width: dot, height: dot)
+                }
+            }
+            Text("in \(Fmt.duration(stop.resetsAt.timeIntervalSince(now)))")
+                .font(.system(size: 10.5, weight: first ? .bold : .semibold)).monospacedDigit()
+                .foregroundStyle(first ? AnyShapeStyle(tint) : AnyShapeStyle(.primary))
+            VStack(spacing: 1) {
+                ForEach(stop.entries.prefix(3)) { e in
+                    VStack(spacing: 0) {
+                        Text(e.account.shortName).font(.system(size: 10.5, weight: .medium))
+                            .foregroundStyle(e.account.kind.tint)
+                        Text("\(e.window.label) · \(Fmt.percent(e.window.usedPercent))")
+                            .font(.system(size: 9.5)).monospacedDigit()
+                            .foregroundStyle(e.window.usedPercent >= 95 ? AnyShapeStyle(.red) : AnyShapeStyle(.secondary))
+                    }
+                    .lineLimit(1).minimumScaleFactor(0.75)
+                }
+                if stop.entries.count > 3 {
+                    Text("+\(stop.entries.count - 3) more").font(.system(size: 9.5)).foregroundStyle(.tertiary)
+                }
+            }
+            .padding(.top, 2)
+        }
+        .padding(.horizontal, 2)
+        .help(stop.entries.map { "\($0.account.shortName) · \($0.window.label): frees \(Fmt.percent($0.window.usedPercent))" }.joined(separator: "\n"))
+    }
+}
+
+/// A stop's dot on the line, with the line running through it so the timeline reads as one stroke.
+private struct Lane<Marker: View>: View {
+    let dot: CGFloat
+    @ViewBuilder var marker: Marker
+
+    var body: some View {
+        ZStack {
+            Rectangle().fill(.primary.opacity(0.18)).frame(height: 2)
+            marker
+        }
+        .frame(height: dot)
     }
 }
 

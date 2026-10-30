@@ -238,6 +238,7 @@ private struct GeneralPane: View {
     @AppStorage(Prefs.notify) private var notify = true
     @AppStorage(Prefs.notifyRanking) private var notifyRanking = true
     @AppStorage(Prefs.showInDock) private var showInDock = true
+    @AppStorage(Prefs.resetView) private var resetView = ResetViewStyle.both.rawValue
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -267,6 +268,12 @@ private struct GeneralPane: View {
                 }
             }
             SettingsCard(title: "App") {
+                Row(title: "Resets", detail: "The ring counts down to the next reset; the timeline lays the resets out left to right from now, with the date and time of each.") {
+                    Picker("", selection: $resetView) {
+                        ForEach(ResetViewStyle.allCases) { Text($0.title).tag($0.rawValue) }
+                    }
+                    .pickerStyle(.segmented).labelsHidden().frame(width: 260)
+                }
                 Row(title: "Show in Dock and app switcher", detail: "Click the Dock icon to open the Dashboard; ⌘-Tab switches to it. Off keeps QuotaBar in the menu bar only.", divider: false) {
                     Toggle("", isOn: $showInDock).toggleStyle(.switch).labelsHidden()
                 }
