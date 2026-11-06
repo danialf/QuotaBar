@@ -49,8 +49,7 @@ struct ZaiProvider {
                                creditText: nil, auxiliary: tools, detail: calls)
         }
         guard !windows.isEmpty else { throw ProviderError("No coding-plan quota on this key") }
-        let plan = (data["level"] as? String)?.capitalized
-        return ProviderSnapshot(account: .zai, plan: plan, windows: windows.sorted { ($0.auxiliary ? 1 : 0, $0.duration ?? 0) < ($1.auxiliary ? 1 : 0, $1.duration ?? 0) })
+        return ProviderSnapshot(account: .zai, planCode: .from(data["level"] as? String), windows: windows.sorted { ($0.auxiliary ? 1 : 0, $0.duration ?? 0) < ($1.auxiliary ? 1 : 0, $1.duration ?? 0) })
     }
 
     /// Z.ai encodes window length as a unit code plus a count.

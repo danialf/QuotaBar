@@ -7,7 +7,7 @@ final class AgentTests: XCTestCase {
     // MARK: Next reset
 
     func snap(_ id: String, _ windows: [(used: Double, resetIn: TimeInterval)]) -> ProviderSnapshot {
-        ProviderSnapshot(account: Account(id: id, kind: .claude, label: id), plan: nil, windows: windows.enumerated().map { i, w in
+        ProviderSnapshot(account: Account(id: id, kind: .claude, label: id), planCode: nil, windows: windows.enumerated().map { i, w in
             UsageWindow(label: "W\(i)", usedPercent: w.used, resetsAt: now.addingTimeInterval(w.resetIn), duration: 7 * 86400)
         })
     }

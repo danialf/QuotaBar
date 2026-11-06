@@ -48,7 +48,7 @@ struct CodexProvider {
         var account = Account.codex
         account.detail = obj["email"] as? String
         Diagnostics.save("codex-usage.json", obj.filter { !["email", "user_id", "account_id"].contains($0.key) })
-        var snap = ProviderSnapshot(account: account, plan: Self.planName(obj["plan_type"] as? String), windows: windows, note: note)
+        var snap = ProviderSnapshot(account: account, planCode: .from(obj["plan_type"] as? String), windows: windows, note: note)
         if let r = obj["rate_limit_reset_credits"] as? [String: Any], let available = J.num(r["available_count"]) {
             snap.resets = .init(available: Int(available), usableNow: Int(J.num(r["applicable_available_count"]) ?? 0))
         }
@@ -88,13 +88,13 @@ struct CodexProvider {
                 return UsageWindow(label: Fmt.windowLabel(seconds), usedPercent: used, resetsAt: reset, duration: seconds)
             }
             if !windows.isEmpty {
-                return ProviderSnapshot(account: .codex, plan: nil, windows: windows, updatedAt: stamp)
+                return ProviderSnapshot(account: .codex, planCode: nil, windows: windows, updatedAt: stamp)
             }
         }
         throw ProviderError("No rate-limit events in Codex logs")
     }
 
-    private static func planName(_ raw: String?) -> String? {
+    static func planName(_ raw: String?) -> String? {
         switch raw?.lowercased() {
         case nil: nil
         case "prolite": "Pro Lite"

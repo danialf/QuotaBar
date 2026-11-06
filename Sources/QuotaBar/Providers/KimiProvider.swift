@@ -21,7 +21,7 @@ struct KimiProvider {
         if windows.isEmpty { windows = Self.countWindows(obj) }
         guard !windows.isEmpty else { throw ProviderError("No Kimi Code quota on this key — check the key and region") }
         let level = ((obj["user"] as? [String: Any])?["membership"] as? [String: Any])?["level"] as? String
-        return ProviderSnapshot(account: .kimi, plan: level.map(Self.planName),
+        return ProviderSnapshot(account: .kimi, planCode: .from(level),
                                 windows: windows.sorted { ($0.duration ?? 0) < ($1.duration ?? 0) })
     }
 
@@ -72,7 +72,7 @@ struct KimiProvider {
     }
 
     /// "LEVEL_ALLEGRETTO" → "Allegretto".
-    private static func planName(_ level: String) -> String {
+    static func planName(_ level: String) -> String {
         level.replacingOccurrences(of: "LEVEL_", with: "").replacingOccurrences(of: "_", with: " ").capitalized
     }
 }

@@ -45,7 +45,7 @@ struct MiniMaxProvider {
         guard !windows.isEmpty else { throw ProviderError("No coding-plan quota on this MiniMax key") }
         let plan = ["current_subscribe_title", "plan_name", "combo_title", "current_plan_title"]
             .compactMap { (data[$0] as? String)?.trimmingCharacters(in: .whitespaces) }.first { !$0.isEmpty }
-        return ProviderSnapshot(account: .minimax, plan: plan,
+        return ProviderSnapshot(account: .minimax, planCode: .from(plan),
                                 windows: windows.values.sorted { ($0.duration ?? 0) < ($1.duration ?? 0) })
     }
 

@@ -57,8 +57,7 @@ struct CursorProvider {
                                        resetsAt: end, duration: duration, creditText: text))
         }
         guard !windows.isEmpty else { throw ProviderError("Cursor returned no plan usage") }
-        let membership = (obj["membershipType"] as? String).map { $0.replacingOccurrences(of: "_", with: " ").capitalized }
-        return ProviderSnapshot(account: .cursor, plan: membership, windows: windows)
+        return ProviderSnapshot(account: .cursor, planCode: .from(obj["membershipType"] as? String), windows: windows)
     }
 
     private static func accessToken() -> String? {

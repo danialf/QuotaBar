@@ -46,7 +46,7 @@ struct GrokProvider {
         let label = duration.map { Fmt.windowLabel($0) == "Weekly" ? "Credits · weekly" : "Credits · \(Fmt.windowLabel($0).lowercased())" } ?? "Credits"
         let window = UsageWindow(label: label, usedPercent: min(100, max(0, used)), resetsAt: end, duration: duration)
         let tier = (config["subscriptionTier"] ?? obj["subscriptionTier"]) as? String
-        var snap = ProviderSnapshot(account: .grok, plan: tier.map(Self.planName), windows: [window])
+        var snap = ProviderSnapshot(account: .grok, planCode: .from(tier), windows: [window])
         snap.note = note
         return snap
     }
@@ -66,7 +66,7 @@ struct GrokProvider {
     }
 
     /// "SUBSCRIPTION_TIER_SUPER_GROK_HEAVY" → "SuperGrok Heavy".
-    private static func planName(_ tier: String) -> String {
+    static func planName(_ tier: String) -> String {
         let words = tier.replacingOccurrences(of: "SUBSCRIPTION_TIER_", with: "").split(separator: "_").map { $0.capitalized }
         return words.joined(separator: " ").replacingOccurrences(of: "Super Grok", with: "SuperGrok")
     }

@@ -125,11 +125,41 @@ struct UsageWindow: Identifiable, Hashable, Codable {
     }
 }
 
+/// A provider's own plan identifier, kept raw so its display name can change without a refetch.
+struct PlanCode: Codable, Hashable {
+    var id: String
+    /// A second field some providers name the plan with (Claude's rate-limit tier).
+    var tier: String?
+
+    init(_ id: String, tier: String? = nil) { self.id = id; self.tier = tier }
+
+    /// nil when the provider reported nothing to name the plan from.
+    static func from(_ id: String?, tier: String? = nil) -> PlanCode? {
+        let id = id ?? "", tier = tier.flatMap { $0.isEmpty ? nil : $0 }
+        return id.isEmpty && tier == nil ? nil : PlanCode(id, tier: tier)
+    }
+
+    func name(for provider: ProviderID) -> String? {
+        switch provider {
+        case .claude: ClaudeProvider.planName(subscription: id, tier: tier ?? "")
+        case .codex: CodexProvider.planName(id)
+        case .grok: GrokProvider.planName(id)
+        case .kimi: KimiProvider.planName(id)
+        case .cursor: id.replacingOccurrences(of: "_", with: " ").capitalized
+        case .zai: id.capitalized
+        case .minimax: id
+        }
+    }
+}
+
 struct ProviderSnapshot: Identifiable, Codable {
     var id: String { account.id }
     var account: Account
     var provider: ProviderID { account.kind }
-    var plan: String?
+    /// The plan as the provider reports it. The display name is derived on every read, so a
+    /// saved reading picks up naming changes (Max 20× → Ultra) instead of freezing the old label.
+    var planCode: PlanCode?
+    var plan: String? { planCode.flatMap { $0.name(for: provider) } }
     var windows: [UsageWindow]
     var note: String?
     var updatedAt: Date = .now

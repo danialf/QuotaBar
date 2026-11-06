@@ -99,10 +99,22 @@ final class ProviderParsingTests: XCTestCase {
         XCTAssertEqual(snap.windows.first { $0.label == "On-demand" }?.creditText, "$12.50 of $50.00 on-demand")
     }
 
+    /// A reading saved before a plan was renamed shows the current name when loaded back.
+    func testSavedSnapshotDerivesThePlanNameOnRead() throws {
+        let saved = ProviderSnapshot(account: Account(id: "claude:.claude", kind: .claude, label: "Main"),
+                                     planCode: PlanCode("max", tier: "default_claude_max_20x"), windows: [])
+        let loaded = try JSONDecoder().decode(ProviderSnapshot.self, from: JSONEncoder().encode(saved))
+        XCTAssertEqual(loaded.plan, "Ultra")
+        let json = String(decoding: try JSONEncoder().encode(saved), as: UTF8.self)
+        XCTAssertFalse(json.contains("Ultra"), "the cache must hold the raw code, not the label")
+        // A cache written by an older build stored only the label: it is ignored, not shown.
+        var legacy = try JSONSerialization.jsonObject(with: JSONEncoder().encode(saved)) as! [String: Any]
+        legacy["planCode"] = nil; legacy["plan"] = "Max 20×"
+        XCTAssertNil(try JSONDecoder().decode(ProviderSnapshot.self, from: JSONSerialization.data(withJSONObject: legacy)).plan)
+    }
+
     func testClaudePlanNamesUltraForTheOld20xTier() {
-        func plan(_ sub: String?, _ tier: String?) -> String? {
-            ClaudeProvider.planName(["subscriptionType": sub as Any, "rateLimitTier": tier as Any].compactMapValues { $0 as? String })
-        }
+        func plan(_ sub: String?, _ tier: String?) -> String? { PlanCode.from(sub, tier: tier)?.name(for: .claude) }
         XCTAssertEqual(plan("max", "default_claude_max_20x"), "Ultra")
         XCTAssertEqual(plan("ultra", "default_claude_ultra"), "Ultra")
         XCTAssertEqual(plan(nil, "default_claude_max_20x"), "Ultra")

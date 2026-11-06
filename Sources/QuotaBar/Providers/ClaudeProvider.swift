@@ -33,12 +33,12 @@ struct ClaudeProvider {
         }
 
         guard !windows.isEmpty else { throw ProviderError("No usage windows in response") }
-        return ProviderSnapshot(account: account, plan: creds.plan, windows: windows, note: note)
+        return ProviderSnapshot(account: account, planCode: creds.plan, windows: windows, note: note)
     }
 
     /// The plan named by the stored login, readable even when the token has expired, so a
     /// saved reading shown in place of a failed fetch still carries today's plan name.
-    func currentPlan() -> String? {
+    func currentPlan() -> PlanCode? {
         (try? Self.credentials(configDir: account.configDir, command: command))?.plan
     }
 
@@ -87,7 +87,7 @@ struct ClaudeProvider {
 
     // MARK: Credentials & discovery
 
-    private struct Credentials { let token: String; let expiresAt: Date?; let plan: String? }
+    private struct Credentials { let token: String; let expiresAt: Date?; let plan: PlanCode? }
 
     /// Claude Code names the Keychain item after the config dir: a plain name for the
     /// default, and "-<first 8 hex of sha256(path)>" for any CLAUDE_CONFIG_DIR.
@@ -112,16 +112,15 @@ struct ClaudeProvider {
               let token = oauth["accessToken"] as? String else {
             throw ProviderError("Not signed in — run `\(command)` and log in")
         }
-        return Credentials(token: token, expiresAt: J.date(oauth["expiresAt"]), plan: planName(oauth))
+        return Credentials(token: token, expiresAt: J.date(oauth["expiresAt"]), plan: .from(oauth["subscriptionType"] as? String, tier: oauth["rateLimitTier"] as? String))
     }
 
-    static func planName(_ oauth: [String: Any]) -> String? {
+    static func planName(subscription: String, tier: String) -> String? {
         // The tier names the usage multiplier, not the plan: a Team premium seat also has a
         // "max_5x" tier. Name the plan from the subscription and add the multiplier.
         // Anthropic renamed Max 20× to Ultra, but older logins still carry
         // subscriptionType "max" with a "…max_20x" tier, so map that to Ultra too.
-        let tier = (oauth["rateLimitTier"] as? String ?? "").lowercased()
-        let sub = (oauth["subscriptionType"] as? String ?? "").lowercased()
+        let tier = tier.lowercased(), sub = subscription.lowercased()
         let multiplier = tier.contains("20x") ? "20×" : tier.contains("5x") ? "5×" : nil
         switch sub {
         case "ultra": return "Ultra"

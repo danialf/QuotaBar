@@ -11,7 +11,7 @@ final class AdvisorTests: XCTestCase {
     func account(_ p: ProviderID) -> Account { Account(id: p.rawValue, kind: p, label: p.shortName) }
 
     func snap(_ p: ProviderID, session: Double, weekly: Double, weeklyResetIn: TimeInterval) -> ProviderSnapshot {
-        ProviderSnapshot(account: account(p), plan: nil, windows: [
+        ProviderSnapshot(account: account(p), planCode: nil, windows: [
             window("Session · 5h", used: session, resetIn: 3600, length: 5 * 3600),
             window("Weekly", used: weekly, resetIn: weeklyResetIn, length: 7 * 86400),
         ])
@@ -100,7 +100,7 @@ final class AdvisorTests: XCTestCase {
 
     func testSideAllowanceIsNotTheLongWindow() {
         // GLM: weekly tokens 63% used, monthly web-search calls 1% used.
-        let glm = ProviderSnapshot(account: account(.zai), plan: "Max", windows: [
+        let glm = ProviderSnapshot(account: account(.zai), planCode: PlanCode("max"), windows: [
             window("Tokens · 5h", used: 27, resetIn: 3600, length: 5 * 3600),
             window("Tokens · weekly", used: 63, resetIn: 3 * 86400, length: 7 * 86400),
             UsageWindow(label: "Web search & tools · monthly", usedPercent: 1, resetsAt: now.addingTimeInterval(20 * 86400),
