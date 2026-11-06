@@ -98,4 +98,18 @@ final class ProviderParsingTests: XCTestCase {
         XCTAssertEqual(snap.quotas.map(\.label), ["Included · monthly"], "Auto/named split and on-demand are not caps")
         XCTAssertEqual(snap.windows.first { $0.label == "On-demand" }?.creditText, "$12.50 of $50.00 on-demand")
     }
+
+    func testClaudePlanNamesUltraForTheOld20xTier() {
+        func plan(_ sub: String?, _ tier: String?) -> String? {
+            ClaudeProvider.planName(["subscriptionType": sub as Any, "rateLimitTier": tier as Any].compactMapValues { $0 as? String })
+        }
+        XCTAssertEqual(plan("max", "default_claude_max_20x"), "Ultra")
+        XCTAssertEqual(plan("ultra", "default_claude_ultra"), "Ultra")
+        XCTAssertEqual(plan(nil, "default_claude_max_20x"), "Ultra")
+        XCTAssertEqual(plan("max", "default_claude_max_5x"), "Max 5×")
+        XCTAssertEqual(plan("max", nil), "Max")
+        XCTAssertEqual(plan(nil, "default_claude_max_5x"), "Max 5×")
+        XCTAssertEqual(plan("team", "default_claude_max_5x"), "Team · 5×")
+        XCTAssertEqual(plan("pro", nil), "Pro")
+    }
 }

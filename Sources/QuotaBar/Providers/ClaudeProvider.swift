@@ -36,6 +36,12 @@ struct ClaudeProvider {
         return ProviderSnapshot(account: account, plan: creds.plan, windows: windows, note: note)
     }
 
+    /// The plan named by the stored login, readable even when the token has expired, so a
+    /// saved reading shown in place of a failed fetch still carries today's plan name.
+    func currentPlan() -> String? {
+        (try? Self.credentials(configDir: account.configDir, command: command))?.plan
+    }
+
     /// The current shape: a flat `limits` list with kind/group/percent/scope.
     private static func limitsList(_ obj: [String: Any]) -> [UsageWindow] {
         (obj["limits"] as? [[String: Any]] ?? []).compactMap { l in
@@ -109,15 +115,20 @@ struct ClaudeProvider {
         return Credentials(token: token, expiresAt: J.date(oauth["expiresAt"]), plan: planName(oauth))
     }
 
-    private static func planName(_ oauth: [String: Any]) -> String? {
+    static func planName(_ oauth: [String: Any]) -> String? {
         // The tier names the usage multiplier, not the plan: a Team premium seat also has a
         // "max_5x" tier. Name the plan from the subscription and add the multiplier.
+        // Anthropic renamed Max 20× to Ultra, but older logins still carry
+        // subscriptionType "max" with a "…max_20x" tier, so map that to Ultra too.
         let tier = (oauth["rateLimitTier"] as? String ?? "").lowercased()
         let sub = (oauth["subscriptionType"] as? String ?? "").lowercased()
         let multiplier = tier.contains("20x") ? "20×" : tier.contains("5x") ? "5×" : nil
         switch sub {
-        case "max": return "Max \(multiplier ?? "")".trimmingCharacters(in: .whitespaces)
-        case "": return multiplier.map { "Max \($0)" }
+        case "ultra": return "Ultra"
+        case "max", "":
+            if multiplier == "20×" { return "Ultra" }
+            if sub.isEmpty { return multiplier.map { "Max \($0)" } }
+            return "Max \(multiplier ?? "")".trimmingCharacters(in: .whitespaces)
         default: return [sub.capitalized, multiplier].compactMap { $0 }.joined(separator: " · ")
         }
     }

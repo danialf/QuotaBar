@@ -279,6 +279,7 @@ final class UsageStore: ObservableObject {
                     if var old = states[a.id]?.snapshot.flatMap({ $0.staleReason == nil ? $0 : nil }) ?? cache[a.id] {
                         old = old.rolledForward()
                         old.staleReason = msg
+                        if a.kind == .claude, let plan = ClaudeProvider(account: a).currentPlan() { old.plan = plan }
                         states[a.id] = .ok(old)
                     } else {
                         states[a.id] = state
