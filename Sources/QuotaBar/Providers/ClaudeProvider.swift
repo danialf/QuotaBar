@@ -128,6 +128,8 @@ struct ClaudeProvider {
             if multiplier == "20×" { return "Ultra" }
             if sub.isEmpty { return multiplier.map { "Max \($0)" } }
             return "Max \(multiplier ?? "")".trimmingCharacters(in: .whitespaces)
+        // A Team premium seat carries a multiplier tier; a standard seat has none.
+        case "team": return multiplier == nil ? "Team Standard" : "Team Premium"
         default: return [sub.capitalized, multiplier].compactMap { $0 }.joined(separator: " · ")
         }
     }

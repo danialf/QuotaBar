@@ -121,7 +121,10 @@ final class ProviderParsingTests: XCTestCase {
         XCTAssertEqual(plan("max", "default_claude_max_5x"), "Max 5×")
         XCTAssertEqual(plan("max", nil), "Max")
         XCTAssertEqual(plan(nil, "default_claude_max_5x"), "Max 5×")
-        XCTAssertEqual(plan("team", "default_claude_max_5x"), "Team · 5×")
+        XCTAssertEqual(plan("team", "default_claude_max_5x"), "Team Premium")
+        XCTAssertEqual(plan("team", "default_claude_ai"), "Team Standard")
+        XCTAssertEqual(plan("team", nil), "Team Standard")
+        XCTAssertEqual(plan("enterprise", "default_claude_max_5x"), "Enterprise · 5×")
         XCTAssertEqual(plan("pro", nil), "Pro")
     }
 }
