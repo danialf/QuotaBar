@@ -24,6 +24,14 @@ will exhaust a window before it resets, and when API spend is on pace to pass it
 Each bar has a tick for "even pace": if the fill is past the tick you are using quota faster
 than the window refills.
 
+## Reset alerts
+
+A weekly (or longer) window that will reset with quota still unspent gets an alert card at the top
+of the dropdown, the Dashboard and the overlay: a warning inside 72 hours, a bolder one inside 48,
+and a red alert inside 24. Windows of one account that reset together (Claude's all-models and
+per-model weeks) make one card, for whichever has least left. A notification goes out as each
+threshold is crossed, once per window cycle (Settings → notifications).
+
 ## Now: next reset and agents
 
 The Dashboard opens with the upcoming weekly (or longer) resets that free something; 5-hour

@@ -160,7 +160,12 @@ struct OverlayView: View {
 
     @ViewBuilder private var compact: some View {
         let accounts = store.orderedAccounts
+        let expiring = store.expiryAlerts()
         VStack(spacing: 8) {
+            if !expiring.isEmpty {
+                ExpiryAlertsCard(alerts: expiring, compact: true)
+                Divider().opacity(0.5)
+            }
             ForEach(Array(accounts.enumerated()), id: \.element.0.id) { i, item in
                 if i > 0 { Divider().opacity(0.5) }
                 AccountLine(account: item.0, state: item.1,
@@ -198,6 +203,8 @@ struct OverlayView: View {
         let warnings = store.advice?.warnings ?? []
         let accounts = Array(store.orderedAccounts.enumerated())
         return VStack(alignment: .leading, spacing: 10) {
+            let expiring = store.expiryAlerts()
+            if !expiring.isEmpty { ExpiryAlertsCard(alerts: expiring) }
             if let advice = store.advice { AdviceCard(advice: advice) }
             if !warnings.isEmpty { WarningsCard(warnings: warnings) }
             NextResetCard(more: 2)

@@ -297,6 +297,7 @@ final class UsageStore: ObservableObject {
         if full { lastFullRefresh = .now }
         recompute()
         notifyThresholds()
+        notifyExpiry()
         notifyRanking()
     }
 
@@ -334,6 +335,11 @@ final class UsageStore: ObservableObject {
             if case .disabled = s { return nil }
             return (a, s)
         }
+    }
+
+    /// Unspent weekly-or-longer quota resetting within 72 hours, soonest first.
+    func expiryAlerts(now: Date = .now) -> [ExpiryAlerts.Alert] {
+        ExpiryAlerts.evaluate(orderedAccounts.compactMap { $0.1.snapshot }, now: now)
     }
 
     var okSpends: [SpendSnapshot] {
@@ -437,6 +443,30 @@ final class UsageStore: ObservableObject {
                 }
             }
         }
+    }
+
+    private static let expiryKey = "notifiedExpiry"
+
+    /// A reminder as unspent long-window quota crosses 72, 48 and 24 hours before its reset,
+    /// once per level per window cycle. Remembered across launches so a restart doesn't repeat it.
+    private func notifyExpiry() {
+        guard defaults.bool(forKey: Prefs.notify), canNotify else { return }
+        let now = Date.now
+        let hour = Int(now.timeIntervalSince1970 / 3600)
+        // Keys end in the reset hour; drop cycles that have already reset.
+        var sent = (defaults.dictionary(forKey: Self.expiryKey) as? [String: Int] ?? [:])
+            .filter { key, _ in key.split(separator: "@").last.flatMap { Int($0) }.map { $0 >= hour } ?? false }
+        for alert in expiryAlerts(now: now) {
+            let key = "\(alert.id)@\(Int(alert.resetsAt.timeIntervalSince1970 / 3600))"
+            guard alert.level.rawValue > sent[key] ?? 0 else { continue }
+            sent[key] = alert.level.rawValue
+            let left = Fmt.duration(alert.resetsAt.timeIntervalSince(now))
+            let when = alert.resetsAt.formatted(.dateTime.weekday(.abbreviated).hour().minute())
+            let tail = alert.level == .critical ? "Burn it now or lose it." : "Burn it before then."
+            post(key, title: "\(alert.level.word): \(alert.account.shortName) \(alert.window.label.lowercased()) resets in \(left)",
+                 body: "\(Fmt.percent(alert.unused)) still unused; it resets \(when). \(tail)")
+        }
+        defaults.set(sent, forKey: Self.expiryKey)
     }
 
     /// Announces a change of the account to use next, and accounts hitting or coming back from a cap.

@@ -25,6 +25,10 @@ struct BriefView: View {
                     Task { await store.refresh() }
                 }
             }
+            let expiring = store.expiryAlerts()
+            if !expiring.isEmpty {
+                ExpiryAlertsCard(alerts: expiring).entrance(0)
+            }
             if let advice = store.advice {
                 AdviceCard(advice: advice).entrance(0)
             }

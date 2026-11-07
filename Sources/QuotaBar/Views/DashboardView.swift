@@ -39,7 +39,11 @@ struct DashboardView: View {
         let after = base + accounts.count
         let warnings = store.advice?.warnings ?? []
         let columns = [GridItem(.adaptive(minimum: 340), spacing: 12, alignment: .top)]
+        let expiring = store.expiryAlerts()
         return VStack(alignment: .leading, spacing: 12) {
+            if !expiring.isEmpty {
+                ExpiryAlertsCard(alerts: expiring).entrance(0)
+            }
             if let advice = store.advice {
                 AdviceCard(advice: advice).entrance(0)
             }
